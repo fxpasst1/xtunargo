@@ -1,40 +1,45 @@
-# --- 第一阶段：下载/构建工具 ---
+# --- 第一阶段：构建/下载层 ---
 FROM alpine:latest AS builder
-RUN apk add --no-cache curl tar
-
-# 设置版本号（建议根据需要更新）
-ARG CLOUDFLARED_VERSION=latest
-# 假设 x-tunnel 是常见的 Go 编译版本，这里以示例下载链接代替
-# 如果你有特定的 x-tunnel 源码，也可以在这里进行编译
+RUN apk add --no-cache curl
 
 WORKDIR /downloads
 
-# 下载 cloudflared (自动识别架构)
+# 定义架构映射逻辑并下载 xtun
+# 注意：GitHub 网页链接需转为 raw.githubusercontent.com 才能直接下载
+ARG XTUN_BASE_URL="https://raw.githubusercontent.com/fxpasst1/xtun/main/bin"
+
 RUN ARCH=$(uname -m) && \
-    if [ "$ARCH" = "x86_64" ]; then CF_ARCH="amd64"; elif [ "$ARCH" = "aarch64" ]; then CF_ARCH="arm64"; else CF_ARCH="arm"; fi && \
-    curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${CF_ARCH} -o cloudflared && \
+    if [ "$ARCH" = "x86_64" ]; then \
+        XTUN_BIN="xtun-linux-amd64" && CF_ARCH="amd64"; \
+    elif [ "$ARCH" = "aarch64" ]; then \
+        XTUN_BIN="xtun-linux-arm64" && CF_ARCH="arm64"; \
+    else \
+        XTUN_BIN="xtun-linux-arm" && CF_ARCH="arm"; \
+    fi && \
+    # 下载 xtun
+    curl -L "${XTUN_BASE_URL}/${XTUN_BIN}" -o xtun && \
+    chmod +x xtun && \
+    # 下载 cloudflared
+    curl -L "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${CF_ARCH}" -o cloudflared && \
     chmod +x cloudflared
 
-# 下载 x-tunnel (请将此处替换为您具体的 x-tunnel 二进制下载地址)
-# 示例：RUN curl -L https://github.com/user/x-tunnel/releases/download/v1.0/x-tunnel-linux -o x-tunnel && chmod +x x-tunnel
-RUN touch x-tunnel && chmod +x x-tunnel 
-
-# --- 第二阶段：最终运行镜像 ---
+# --- 第二阶段：运行层 ---
 FROM alpine:latest
-RUN apk add --no-cache ca-certificates libc6-compat
+# 安装基本运行库（xtun 可能是静态编译的，但 alpine 需要 ca-certificates 来做 HTTPS 转发）
+RUN apk add --no-cache ca-certificates libc6-compat tzdata
 
 WORKDIR /app
 
-# 从构建阶段拷贝二进制文件
+# 从 builder 层拷贝
+COPY --from=builder /downloads/xtun /usr/local/bin/xtun
 COPY --from=builder /downloads/cloudflared /usr/local/bin/cloudflared
-COPY --from=builder /downloads/x-tunnel /usr/local/bin/x-tunnel
 
 # 拷贝启动脚本
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-# 声明环境变量（方便运行时通过 -e 传入参数）
+# 默认环境变量
 ENV CF_TOKEN=""
-ENV XTUNNEL_ARGS=""
+ENV XTUN_ARGS=""
 
 ENTRYPOINT ["/entrypoint.sh"]
