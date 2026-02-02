@@ -2,9 +2,9 @@
 
 # 启动 xtun (后台运行)
 # 假设 xtun 的用法是 xtun -config config.json 或直接接参数
-if [ -n "$XTUN_ARGS" ]; then
-    echo "Starting xtun with args: ${XTUN_ARGS}"
-    /usr/local/bin/xtun ${XTUN_ARGS} &
+if [ -n "$WSPORT" ]; then
+    echo "Starting xtun with args: -l ws://127.0.0.1:${WSPORT} -token ${XTUN_TOKEN}"
+    /usr/local/bin/xtun  -l ws://127.0.0.1:${WSPORT} -token ${XTUN_TOKEN} &
 else
     echo "Warning: XTUN_ARGS is empty, xtun might not do anything."
 fi
