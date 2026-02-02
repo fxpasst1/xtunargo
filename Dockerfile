@@ -40,6 +40,8 @@ RUN chmod +x /entrypoint.sh
 
 # 默认环境变量
 ENV CF_TOKEN=""
-ENV XTUN_ARGS=""
+ENV XTUN_TOKEN=""
+ENV M_PORT="40002"
+ENV WSPORT="40001"
 
 ENTRYPOINT ["/entrypoint.sh"]
